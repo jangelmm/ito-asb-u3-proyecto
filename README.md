@@ -4,6 +4,252 @@ Este documento explica en detalle el funcionamiento del programa en ensamblador 
 
 ---
 
+```assembly
+.286
+pila segment stack
+    db 32 DUP('stack--')  ; Reserva 32 bytes para la pila
+pila ends
+
+datos segment
+    ; Mensajes para el men?
+    titulo db 13,10,'=== MENU DE PIRAMIDES ===','$'
+    opcion1 db 13,10,'1. Piramide Normal (Hacia Arriba)','$'
+    opcion2 db 13,10,'2. Piramide Hacia Abajo','$'
+    opcion3 db 13,10,'3. Piramide Izquierda','$'
+    opcion4 db 13,10,'4. Piramide Derecha','$'
+    opcion5 db 13,10,'5. Salir','$'
+    prompt db 13,10,'Seleccione una opcion (1-5): ','$'
+    continuar db 'Presione Enter para continuar...','$'
+    error db 13,10,'Opcion invalida, intente de nuevo.','$'
+    salto_linea db 13,10,'$'
+    seleccion db ?  ; Variable para almacenar la opci?n del usuario
+    var dw ?        ; Variable para preservar CX
+datos ends
+
+codigo segment 'code'
+    ; Macro para posicionar el cursor en la pantalla
+    POSICIONAR_CURSOR MACRO fila, columna
+        mov ah, 02h        ; Funci?n para posicionar cursor
+        mov bh, 00h        ; P?gina de video 0
+        mov dh, fila       ; Fila
+        mov dl, columna    ; Columna
+        int 10h            ; Interrupci?n de video
+    ENDM
+
+    ; Macro para imprimir un car?cter en la pantalla
+    IMPRIMIR_CARACTER MACRO caracter, cantidad
+        mov ah, 0Ah        ; Funci?n para escribir car?cter
+        mov al, caracter   ; Car?cter a imprimir
+        mov cx, cantidad   ; N?mero de veces a repetir
+        int 10h            ; Interrupci?n de video
+    ENDM
+
+    main proc far
+    assume ss:pila, ds:datos, cs:codigo
+    
+    ; Configurar segmento de datos
+    push ds
+    push 0
+    mov ax, datos
+    mov ds, ax
+    
+menu_principal:
+    ; Limpiar pantalla
+    call limpiar_pantalla
+    
+    ; Mostrar men?
+    call mostrar_menu
+    
+    ; Leer opci?n del usuario
+    mov ah, 01h        ; Funci?n para leer car?cter
+    int 21h
+    mov seleccion, al  ; Guardar opci?n
+    
+    ; Comparar opci?n y saltar al procedimiento correspondiente
+    cmp seleccion, '1'
+    je piramide_arriba
+    cmp seleccion, '2'
+    je piramide_abajo
+    cmp seleccion, '3'
+    je piramide_izquierda
+    cmp seleccion, '4'
+    je piramide_derecha
+    cmp seleccion, '5'
+    je salir
+    jmp opcion_invalida
+    
+piramide_arriba:
+    call dibujar_piramide_arriba
+    jmp esperar_continuar
+    
+piramide_abajo:
+    call dibujar_piramide_abajo
+    jmp esperar_continuar
+    
+piramide_izquierda:
+    call dibujar_piramide_izquierda
+    jmp esperar_continuar
+    
+piramide_derecha:
+    call dibujar_piramide_derecha
+    jmp esperar_continuar
+    
+opcion_invalida:
+    mov ah, 09h
+    lea dx, error
+    int 21h
+    jmp esperar_continuar
+    
+esperar_continuar:
+    ; Posicionar cursor en una fila segura para evitar sobreposici?n
+    POSICIONAR_CURSOR 21, 0
+    ; Mostrar mensaje de continuar
+    mov ah, 09h
+    lea dx, continuar
+    int 21h
+    
+    ; Esperar Enter
+    mov ah, 01h
+    int 21h
+    cmp al, 0Dh        ; Comparar con retorno de carro
+    je menu_principal
+    
+salir:
+    ; Terminar programa
+    mov ax, 4C00h
+    int 21h
+    
+    main endp
+    
+    ; Procedimiento para limpiar la pantalla
+    limpiar_pantalla proc near
+        mov ax, 0600h      ; Funci?n para desplazar pantalla (limpiar)
+        mov bh, 4Fh        ; Atributo: BN:07h - BA:1fh - VN:02h - NV:20h
+        mov cx, 0000h      ; Esquina superior izquierda
+        mov dx, 184Fh      ; Esquina inferior derecha (24,79)
+        int 10h
+        POSICIONAR_CURSOR 0, 0  ; Reposicionar cursor
+        ret
+    limpiar_pantalla endp
+    
+    ; Procedimiento para mostrar el men?
+    mostrar_menu proc near
+        mov ah, 09h        ; Funci?n para imprimir cadena
+        lea dx, titulo
+        int 21h
+        lea dx, opcion1
+        int 21h
+        lea dx, opcion2
+        int 21h
+        lea dx, opcion3
+        int 21h
+        lea dx, opcion4
+        int 21h
+        lea dx, opcion5
+        int 21h
+        lea dx, prompt
+        int 21h
+        ret
+    mostrar_menu endp
+    
+    ; Procedimiento para dibujar pir?mide hacia arriba
+    dibujar_piramide_arriba proc near
+        call limpiar_pantalla
+        mov cx, 20         ; N?mero de filas
+        mov dh, 19         ; Fila inicial (abajo)
+        mov dl, 12         ; Columna inicial
+        mov bx, 39         ; Cantidad inicial de asteriscos
+    ciclo_arriba:
+        POSICIONAR_CURSOR dh, dl
+        IMPRIMIR_CARACTER '*', bx
+        add dl, 1          ; Mover columna a la derecha
+        sub dh, 1          ; Subir una fila
+        sub bx, 2          ; Reducir asteriscos
+        loop ciclo_arriba
+        ret
+    dibujar_piramide_arriba endp
+    
+    ; Procedimiento para dibujar pir?mide hacia abajo
+    dibujar_piramide_abajo proc near
+        call limpiar_pantalla
+        mov cx, 20         ; N?mero de filas
+        mov dh, 0          ; Fila inicial (arriba)
+        mov dl, 12         ; Columna inicial
+        mov bx, 39         ; Cantidad inicial de asteriscos
+    ciclo_abajo:
+        POSICIONAR_CURSOR dh, dl
+        IMPRIMIR_CARACTER '*', bx
+        add dl, 1          ; Mover columna a la derecha
+        add dh, 1          ; Bajar una fila
+        sub bx, 2          ; Reducir asteriscos
+        loop ciclo_abajo
+        ret
+    dibujar_piramide_abajo endp
+    
+    ; Procedimiento para dibujar pir?mide izquierda
+    dibujar_piramide_izquierda proc near
+        call limpiar_pantalla
+        mov cx, 10         ; Primer ciclo: crecimiento
+        mov dh, 0          ; Fila inicial
+        mov dl, 22         ; Columna inicial (16h = 22)
+        mov bx, 1          ; Cantidad inicial de asteriscos
+    ciclo_izq1:
+        mov var, cx        ; Preservar CX
+        POSICIONAR_CURSOR dh, dl
+        IMPRIMIR_CARACTER '*', bx
+        mov cx, var        ; Restaurar CX
+        sub dl, 1          ; Mover columna a la izquierda
+        add dh, 1          ; Bajar una fila
+        add bx, 1          ; Aumentar asteriscos
+        loop ciclo_izq1
+        mov cx, 10         ; Segundo ciclo: decrecimiento
+        mov dl, 14         ; Nueva columna inicial (0Bh + 03h = 14)
+        sub bx, 2          ; Ajustar asteriscos
+    ciclo_izq2:
+        mov var, cx        ; Preservar CX
+        POSICIONAR_CURSOR dh, dl
+        IMPRIMIR_CARACTER '*', bx
+        mov cx, var        ; Restaurar CX
+        add dl, 1          ; Mover columna a la derecha
+        add dh, 1          ; Bajar una fila
+        sub bx, 1          ; Reducir asteriscos
+        loop ciclo_izq2
+        ret
+    dibujar_piramide_izquierda endp
+    
+    ; Procedimiento para dibujar pir?mide derecha
+    dibujar_piramide_derecha proc near
+        call limpiar_pantalla
+        mov cx, 10         ; Primer ciclo: crecimiento
+        mov dh, 0          ; Fila inicial
+        mov dl, 10         ; Columna inicial (0Ah = 10)
+        mov bx, 1          ; Cantidad inicial de asteriscos
+    ciclo_der1:
+        mov var, cx        ; Preservar CX
+        POSICIONAR_CURSOR dh, dl
+        IMPRIMIR_CARACTER '*', bx
+        mov cx, var        ; Restaurar CX
+        add dh, 1          ; Bajar una fila
+        add bx, 1          ; Aumentar asteriscos
+        loop ciclo_der1
+        mov cx, 10         ; Segundo ciclo: decrecimiento
+        mov dl, 10         ; Mantener columna inicial
+        sub bx, 2          ; Ajustar asteriscos
+    ciclo_der2:
+        mov var, cx        ; Preservar CX
+        POSICIONAR_CURSOR dh, dl
+        IMPRIMIR_CARACTER '*', bx
+        mov cx, var        ; Restaurar CX
+        add dh, 1          ; Bajar una fila
+        sub bx, 1          ; Reducir asteriscos
+        loop ciclo_der2
+        ret
+    dibujar_piramide_derecha endp
+    
+codigo ends
+end main
+```
+
 ## 1. Introducción al Código
 
 El programa es un ejemplo de programación en ensamblador para MS-DOS que presenta un menú con cinco opciones:
@@ -169,12 +415,13 @@ mostrar_menu endp
   1. Piramide Normal (Hacia Arriba)
   2. Piramide Hacia Abajo
   3. Piramide Izquierda
- 4. Piramide Derecha
+  4. Piramide Derecha
   5. Salir
   Seleccione una opcion (1-5):
   ```
 
 ### 4.3. `dibujar_piramide_arriba`
+
 ```assembly
 dibujar_piramide_arriba proc near
     call limpiar_pantalla
@@ -520,136 +767,3 @@ Para prepararte, aquí hay preguntas que podrían hacerte y cómo responderlas:
 ## 8. Conclusión
 
 El programa es un ejemplo bien estructurado de programación en ensamblador que combina macros, procedimientos, e interrupciones para crear un menú interactivo y dibujar pirámides en modo texto. Su flujo es claro, con un bucle principal que maneja la entrada del usuario y delega tareas a procedimientos específicos. Las macros simplifican operaciones repetitivas, y los procedimientos modularizan la lógica. El diagrama en Mermaid y las explicaciones detalladas deberían ayudarte a entender y explicar el código en tu evaluación. Si necesitas más ejemplos, simulaciones, o práctica con preguntas, ¡avísame!
-
-
-# Explicación Detallada del Código: Menú de Pirámides en Ensamblador
-
-## Introducción
-Este programa en ensamblador para MS-DOS implementa un menú interactivo que permite al usuario seleccionar entre dibujar cuatro tipos de pirámides (hacia arriba, hacia abajo, izquierda, derecha) o salir. Utiliza macros, procedimientos, e interrupciones para manipular la pantalla en modo texto (80x25). A continuación, se explica su estructura, flujo, macros, procedimientos, y detalles técnicos.
-
-## Estructura del Código
-
-### Segmento de Pila
-```assembly
-pila segment stack
-    db 32 DUP('stack--')
-pila ends
-```
-- Reserva 32 bytes para la pila, usada para almacenar direcciones de retorno y datos temporales.
-
-### Segmento de Datos
-```assembly
-datos segment
-    titulo db 13,10,'=== MENU DE PIRAMIDES ===','$'
-    opcion1 db 13,10,'1. Piramide Normal (Hacia Arriba)','$'
-    opcion2 db 13,10,'2. Piramide Hacia Abajo','$'
-    opcion3 db 13,10,'3. Piramide Izquierda','$'
-    opcion4 db 13,10,'4. Piramide Derecha','$'
-    opcion5 db 13,10,'5. Salir','$'
-    prompt db 13,10,'Seleccione una opcion (1-5): ','$'
-    continuar db 'Presione Enter para continuar...','$'
-    error db 13,10,'Opcion invalida, intente de nuevo.','$'
-    salto_linea db 13,10,'$'
-    seleccion db ?
-    var dw ?
-datos ends
-```
-- Almacena cadenas para el menú y variables:
-  - `seleccion`: Guarda la opción del usuario.
-  - `var`: Preserva `CX` en los bucles de las pirámides izquierda y derecha.
-
-### Segmento de Código
-Contiene macros, procedimientos, y el procedimiento principal (`main`).
-
-## Macros
-
-### POSICIONAR_CURSOR
-```assembly
-POSICIONAR_CURSOR MACRO fila, columna
-    mov ah, 02h
-    mov bh, 00h
-    mov dh, fila
-    mov dl, columna
-    int 10h
-ENDM
-```
-- Mueve el cursor a la posición (`fila`, `columna`) usando `int 10h`, función `02h`.
-
-### IMPRIMIR_CARACTER
-```assembly
-IMPRIMIR_CARACTER MACRO caracter, cantidad
-    mov ah, 0Ah
-    mov al, caracter
-    mov cx, cantidad
-    int 10h
-ENDM
-```
-- Imprime `caracter` (por ejemplo, `*`) `cantidad` veces usando `int 10h`, función `0Ah`.
-
-## Procedimientos
-
-### limpiar_pantalla
-- Limpia la pantalla con `int 10h`, `AX = 0600h`, y reposiciona el cursor en (0,0).
-
-### mostrar_menu
-- Imprime el menú y el prompt usando `int 21h`, `AH = 09h`.
-
-### dibujar_piramide_arriba
-- Dibuja una pirámide de base ancha (39 asteriscos) en la fila 19, reduciendo asteriscos y subiendo filas.
-
-### dibujar_piramide_abajo
-- Similar, pero comienza en la fila 0 y baja filas.
-
-### dibujar_piramide_izquierda
-- Primer ciclo: Crece de 1 a 10 asteriscos, columna 22 a 13, filas 0 a 9.
-- Segundo ciclo: Decrece de 9 a 0 asteriscos, columna 14 a 23, filas 10 a 19.
-- Usa `var` para preservar `CX`.
-
-### dibujar_piramide_derecha
-- Primer ciclo: Crece de 1 a 10 asteriscos, columna 10, filas 0 a 9.
-- Segundo ciclo: Decrece de 9 a 0 asteriscos, columna 10, filas 10 a 19.
-- Usa `var` para preservar `CX`.
-
-## Flujo del Programa
-1. Configura el segmento de datos.
-2. Bucle `menu_principal`:
-   - Limpia pantalla, muestra menú, lee opción.
-   - Ejecuta el procedimiento correspondiente (pirámide o salir) o muestra error.
-3. `esperar_continuar`: Muestra mensaje en fila 21, espera Enter, regresa al menú.
-4. `salir`: Termina con `int 21h`, `AX = 4C00h`.
-
-## Diagrama de Flujo
-```mermaid
-graph TD
-    A[Inicio: Configurar DS] --> B[menu_principal]
-    B --> C[limpiar_pantalla]
-    C --> D[mostrar_menu]
-    D --> E[Leer selección]
-    E --> F{¿Opción?}
-    F -->|1| G[piramide_arriba]
-    F -->|2| H[piramide_abajo]
-    F -->|3| I[piramide_izquierda]
-    F -->|4| J[piramide_derecha]
-    F -->|5| K[salir]
-    F -->|Otro| L[opcion_invalida]
-    G --> M[dibujar_piramide_arriba]
-    H --> N[dibujar_piramide_abajo]
-    I --> O[dibujar_piramide_izquierda]
-    J --> P[dibujar_piramide_derecha]
-    L --> Q[Imprimir error]
-    M --> R[esperar_continuar]
-    N --> R
-    O --> R
-    P --> R
-    Q --> R
-    R --> S[Posicionar cursor 21,0]
-    S --> T[Imprimir 'Presione Enter...']
-    T --> U[Esperar tecla]
-    U --> V{¿Es Enter?}
-    V -->|Sí| B
-    V -->|No| U
-    K --> W[Terminar programa]
-```
-
-## Conclusión
-El programa es modular, usa macros para tareas repetitivas y procedimientos para funciones específicas. Las interrupciones `10h` y `21h` permiten interacción con la pantalla y el teclado. La preservación de `CX` en las pirámides izquierda y derecha asegura bucles correctos.
